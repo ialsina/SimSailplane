@@ -66,67 +66,72 @@ class SolViewer:
 
     def phase_plot(self, x_var, y_var, z_var=None, *, time_color=False, figsize=(8,6), title=None):
         """
-        Plot a phase diagram of two or three variables.
+        Plot a phase diagram of two or three variables, optionally derived via a function.
 
         Args:
-            x_var: variable index or name for x-axis
-            y_var: variable index or name for y-axis
-            z_var: variable index or name for z-axis (optional; if provided, 3D plot)
+            x_var: variable index/name or a tuple (vars_tuple, func) to compute x-values
+            y_var: variable index/name or a tuple (vars_tuple, func) to compute y-values
+            z_var: optional variable/index/name or tuple (vars_tuple, func) for 3D plot
             time_color: if True, color points by time along the trajectory
-                        if False, use different color per trajectory
             figsize: figure size
             title: optional plot title
         """
-        # Map names to indices
-        def var_to_index(v):
-            if isinstance(v, int):
-                return v
-            elif isinstance(v, str):
-                if v in self.var_names:
-                    return self.var_names.index(v)
-                else:
-                    raise ValueError(f"Variable name {v} not found.")
-            else:
-                raise TypeError("Variable must be int or str")
 
-        xi = var_to_index(x_var)
-        yi = var_to_index(y_var)
-        zi = var_to_index(z_var) if z_var is not None else None
+        def eval_var(var, y):
+            """Evaluate variable, supporting index/name or tuple (vars, func)."""
+            if isinstance(var, tuple):
+                vars_list, func = var
+                indices = [self.var_names.index(v) if isinstance(v, str) else v for v in vars_list]
+                return func(*[y[:, idx] for idx in indices])
+            else:
+                idx = self.var_names.index(var) if isinstance(var, str) else var
+                return y[:, idx]
 
         # Determine 2D vs 3D
-        if zi is None:
+        is_3d = z_var is not None
+
+        if not is_3d:
             fig, ax = plt.subplots(figsize=figsize)
             if time_color:
                 for sol in self.sols:
                     y = sol.y.T
                     t = sol.t
-                    sc = ax.scatter(y[:, xi], y[:, yi], c=t, cmap='viridis', s=10)
+                    x_vals = eval_var(x_var, y)
+                    y_vals = eval_var(y_var, y)
+                    sc = ax.scatter(x_vals, y_vals, c=t, cmap='viridis', s=10)
                 cbar = plt.colorbar(sc)
                 cbar.set_label("Time [s]")
             else:
                 for sol, label in zip(self.sols, self.labels):
                     y = sol.y.T
-                    ax.plot(y[:, xi], y[:, yi], label=label)
-            ax.set_xlabel(self.var_names[xi])
-            ax.set_ylabel(self.var_names[yi])
+                    x_vals = eval_var(x_var, y)
+                    y_vals = eval_var(y_var, y)
+                    ax.plot(x_vals, y_vals, label=label)
+            ax.set_xlabel(str(x_var))
+            ax.set_ylabel(str(y_var))
         else:
-            # 3D plot
             fig = plt.figure(figsize=figsize)
             ax = fig.add_subplot(111, projection='3d')
             if time_color:
                 for sol in self.sols:
                     y = sol.y.T
                     t = sol.t
-                    sc = ax.scatter(y[:, xi], y[:, yi], y[:, zi], c=t, cmap='viridis', s=10)
+                    x_vals = eval_var(x_var, y)
+                    y_vals = eval_var(y_var, y)
+                    z_vals = eval_var(z_var, y)
+                    sc = ax.scatter(x_vals, y_vals, z_vals, c=t, cmap='viridis', s=10)
                 cbar = plt.colorbar(sc)
                 cbar.set_label("Time [s]")
             else:
                 for sol, label in zip(self.sols, self.labels):
                     y = sol.y.T
-                    ax.plot(y[:, xi], y[:, yi], y[:, zi], label=label)
-            ax.set_xlabel(self.var_names[xi])
-            ax.set_ylabel(self.var_names[yi])
-            ax.set_zlabel(self.var_names[zi])
+                    x_vals = eval_var(x_var, y)
+                    y_vals = eval_var(y_var, y)
+                    z_vals = eval_var(z_var, y)
+                    ax.plot(x_vals, y_vals, z_vals, label=label)
+            ax.set_xlabel(str(x_var))
+            ax.set_ylabel(str(y_var))
+            ax.set_zlabel(str(z_var))
 
         if title:
             ax.set_title(title)
@@ -135,4 +140,3 @@ class SolViewer:
             ax.legend()
 
         return fig
-
