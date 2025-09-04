@@ -10,7 +10,12 @@ Units: radians for control surfaces, 0..1 for airbrake
 
 import numpy as np
 import itertools
-from typing import List, Dict, Callable
+from typing import List, Dict, Callable, Iterator
+
+
+import numpy as np
+import itertools
+from typing import List, Dict, Callable, Iterator
 
 
 def clamp(x, lo, hi):
@@ -26,14 +31,11 @@ def control_dict_from_vec(v: np.ndarray) -> Dict:
     }
 
 
-class ActionController:
-    def __init__(
-        self,
-        bounds: List[tuple],
-        max_rate: List[float],
-        dt: float,
-        initial: np.ndarray = None,
-    ):
+# ------------------------
+# Base class (shared logic)
+# ------------------------
+class BaseActionController:
+    def __init__(self, bounds, max_rate, dt, initial=None):
         """
         Args:
           bounds: [(a_min,a_max), (e_min,e_max), (r_min,r_max), (ab_min,ab_max)]
@@ -48,18 +50,11 @@ class ActionController:
         if initial is None:
             self.initial = np.zeros(4)
         else:
-            self.initial = initial.copy()
+            self.initial = np.array(initial, dtype=float)
 
-    # -----------------
-    # trajectory generation
-    # -----------------
-    def enumerate_bfs(
-        self,
-        steps: int,
-        discretization_per_control=(3, 3, 3, 3),
-        max_paths: int = 1000,
-    ) -> List[np.ndarray]:
-        """Enumerate all possible trajectories within limits (breadth-first)."""
+    # ---- increment utilities ----
+    def step_increments(self, discretization_per_control):
+        """Precompute possible increments for each timestep."""
         increments_per_control = []
         for i, n in enumerate(discretization_per_control):
             if n <= 1:
@@ -67,12 +62,44 @@ class ActionController:
             else:
                 increments = np.linspace(-self.step_max[i], self.step_max[i], n)
             increments_per_control.append(increments)
+        return list(itertools.product(*increments_per_control))
 
-        step_increments = np.array(
-            list(itertools.product(*increments_per_control))
-        )  # (branch,4)
+    # ---- trajectory count ----
+    def num_trajectories(self, steps: int, discretization_per_control) -> int:
+        branch = np.prod(discretization_per_control)
+        return branch**steps
 
-        # queue of partial trajectories
+    # ---- trajectory → time function ----
+    def trajectory_to_ctrl_timefun(self, traj: np.ndarray, t0: float = 0.0) -> Callable:
+        """Convert trajectory (N x 4) to ctrl_timefun(t)."""
+        times = t0 + np.arange(traj.shape[0]) * self.dt
+
+        def ctrl_timefun(t):
+            if t <= times[0]:
+                idx = 0
+            elif t >= times[-1]:
+                idx = len(times) - 1
+            else:
+                idx = int((t - times[0]) // self.dt)
+                idx = clamp(idx, 0, len(times) - 1)
+            return control_dict_from_vec(traj[idx])
+
+        return ctrl_timefun
+
+
+# ------------------------
+# Eager controller
+# ------------------------
+class ActionController(BaseActionController):
+    def enumerate_bfs(
+        self,
+        steps: int,
+        discretization_per_control=(3, 3, 3, 3),
+        max_paths: int = 1000,
+    ) -> List[np.ndarray]:
+        """Eagerly build all trajectories (up to max_paths)."""
+        step_increments = self.step_increments(discretization_per_control)
+
         queue = [[self.initial.copy()]]
         results = []
 
@@ -86,9 +113,9 @@ class ActionController:
 
             cur = traj[-1]
             for inc in step_increments:
-                nxt = cur + inc
+                nxt = cur + np.array(inc)
                 for j, (lo, hi) in enumerate(self.bounds):
-                    nxt[j] = clamp(nxt[j], lo, hi)
+                    nxt[j] = np.clip(nxt[j], lo, hi)
                 if np.any(np.abs(nxt - cur) > self.step_max + 1e-12):
                     continue
                 queue.append(traj + [nxt.copy()])
@@ -96,13 +123,10 @@ class ActionController:
         return results
 
     def generate_primitives(self, steps: int) -> List[np.ndarray]:
-        """Generate ramp-up, ramp-down, hold primitives for each control."""
-        trajectories = []
-
+        """Generate hold, ramp-up, ramp-down primitives."""
         def control_prims(val, lo, hi, step):
             arrs = []
-            # hold
-            arrs.append(np.full(steps + 1, val))
+            arrs.append(np.full(steps + 1, val))  # hold
             # ramp up
             up = [val]
             for _ in range(steps):
@@ -120,6 +144,7 @@ class ActionController:
             lo, hi = self.bounds[i]
             prims.append(control_prims(self.initial[i], lo, hi, self.step_max[i]))
 
+        trajectories = []
         for pa in prims[0]:
             for pe in prims[1]:
                 for pr in prims[2]:
@@ -128,79 +153,58 @@ class ActionController:
 
         return trajectories
 
-    def sample_random(self, steps: int, n_samples: int = 100, seed=None) -> List[np.ndarray]:
-        """Random sampling of action trajectories within bounds and derivative limits."""
-        rng = np.random.default_rng(seed)
-        samples = []
-        for _ in range(n_samples):
-            traj = np.zeros((steps + 1, 4))
-            traj[0] = self.initial.copy()
-            for k in range(1, steps + 1):
-                inc = rng.uniform(-self.step_max, self.step_max)
-                nxt = traj[k - 1] + inc
-                for j, (lo, hi) in enumerate(self.bounds):
-                    nxt[j] = clamp(nxt[j], lo, hi)
-                traj[k] = nxt
-            samples.append(traj)
-        return samples
 
-    # -----------------
-    # utility for simulation
-    # -----------------
-    def trajectory_to_ctrl_timefun(self, traj: np.ndarray, t0: float = 0.0) -> Callable:
-        """Convert trajectory (N x 4) to ctrl_timefun(t)."""
-        times = t0 + np.arange(traj.shape[0]) * self.dt
-
-        def ctrl_timefun(t):
-            if t <= times[0]:
-                idx = 0
-            elif t >= times[-1]:
-                idx = len(times) - 1
-            else:
-                idx = int((t - times[0]) // self.dt)
-                idx = clamp(idx, 0, len(times) - 1)
-            return control_dict_from_vec(traj[idx])
-
-        return ctrl_timefun
-
-    def run_on_model(
+# ------------------------
+# Lazy controller
+# ------------------------
+class ActionControllerLazy(BaseActionController):
+    def enumerate_lazy(
         self,
-        model,
-        x0,
         steps: int,
-        trajectories: List[np.ndarray],
-        wind_timefun=lambda t: np.zeros(3),
-        max_runs=20,
-    ):
-        """Run trajectories on a sailplane model."""
-        results = []
-        for i, traj in enumerate(trajectories):
-            if i >= max_runs:
-                break
-            T = self.dt * (steps)
-            ctrl_fun = self.trajectory_to_ctrl_timefun(traj)
-            sol = model.integrate(x0, (0, T), ctrl_timefun=ctrl_fun, wind_timefun=wind_timefun)
-            results.append((traj, sol))
-        return results
+        discretization_per_control=(3, 3, 3, 3),
+    ) -> Iterator[np.ndarray]:
+        """Yield trajectories lazily (one at a time)."""
+        step_increments = self.step_increments(discretization_per_control)
 
+        def recurse(traj, depth):
+            if depth == steps:
+                yield np.vstack(traj)
+                return
+            cur = traj[-1]
+            for inc in step_increments:
+                nxt = cur + np.array(inc)
+                for j, (lo, hi) in enumerate(self.bounds):
+                    nxt[j] = np.clip(nxt[j], lo, hi)
+                if np.any(np.abs(nxt - cur) > self.step_max + 1e-12):
+                    continue
+                yield from recurse(traj + [nxt.copy()], depth + 1)
 
-if __name__ == "__main__":
-    deg = np.pi / 180.0
-    bounds = [(-20 * deg, 20 * deg), (-15 * deg, 15 * deg), (-15 * deg, 15 * deg), (0, 1)]
-    max_rate = [30 * deg, 20 * deg, 20 * deg, 0.5]  # per second
-    dt = 0.5
-    ctrl = ActionController(bounds, max_rate, dt)
+        yield from recurse([self.initial.copy()], 0)
 
-    steps = 5
-    # Enumerate
-    enum_trajs = ctrl.enumerate_bfs(steps, max_paths=50)
-    print("Enumerated:", len(enum_trajs))
+    def trajectory_by_index(
+        self,
+        index: int,
+        steps: int,
+        discretization_per_control=(3, 3, 3, 3),
+    ) -> np.ndarray:
+        """Compute nth trajectory directly (random access)."""
+        step_increments = self.step_increments(discretization_per_control)
+        branch = len(step_increments)
 
-    # Primitives
-    prim_trajs = ctrl.generate_primitives(steps)
-    print("Primitives:", len(prim_trajs))
+        digits = []
+        for _ in range(steps):
+            digits.append(index % branch)
+            index //= branch
+        if index > 0:
+            raise IndexError("Index exceeds total number of trajectories")
 
-    # Random
-    rnd_trajs = ctrl.sample_random(steps, n_samples=10, seed=42)
-    print("Random:", len(rnd_trajs))
-
+        traj = [self.initial.copy()]
+        cur = self.initial.copy()
+        for d in digits:
+            inc = np.array(step_increments[d])
+            nxt = cur + inc
+            for j, (lo, hi) in enumerate(self.bounds):
+                nxt[j] = np.clip(nxt[j], lo, hi)
+            traj.append(nxt.copy())
+            cur = nxt
+        return np.vstack(traj)
