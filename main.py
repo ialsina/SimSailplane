@@ -55,8 +55,8 @@ viewer = SolViewer(sols, var_names=var_names)
 plt.ion()
 
 fig = viewer.phase_plot(
-    (("pN", "pE", "pD"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2)),
-    (("u", "v", "w"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2)),
+    (("pN", "pE", "pD"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2), "Dist to (0, 0, 0)"),
+    (("u", "v", "w"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2), "Speed"),
     title="Position Speed"
 )
 
@@ -66,7 +66,7 @@ fig = viewer.phase_plot(
     "pN",
     "pE",
     "pD",
-    color=(("u", "v", "w"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2)),
+    color=(("u", "v", "w"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2), "Speed"),
     title="Position Speed"
 )
 
@@ -75,8 +75,8 @@ fig.show()
 
 fig = viewer.phase_plot(
     "pN",
+    (("u", "v", "w"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2), "Speed"),
     "pD",
-    (("u", "v", "w"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2)),
     color="time",
     title="Position Speed Time"
 )

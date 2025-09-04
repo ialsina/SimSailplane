@@ -69,30 +69,34 @@ class SolViewer:
         Plot a phase diagram of two or three variables, with optional coloring.
 
         Args:
-            x_var: variable index/name or a tuple (vars_tuple, func) to compute x-values
-            y_var: variable index/name or a tuple (vars_tuple, func) to compute y-values
-            z_var: optional variable/index/name or tuple (vars_tuple, func) for 3D plot
-            color: None, "time", variable index/name, or tuple (vars_tuple, func)
-                Determines the color of points/lines. Adds a colorbar if not None.
+            x_var: variable index/name or tuple (vars_tuple, func, optional_label)
+            y_var: variable index/name or tuple (vars_tuple, func, optional_label)
+            z_var: optional variable/index/name or tuple (vars_tuple, func, optional_label)
+            color: None, "time", variable index/name, or tuple (vars_tuple, func, optional_label)
             figsize: figure size
             title: optional plot title
         """
 
         def eval_var(var, y, t=None):
-            """Evaluate variable, supporting index/name or tuple (vars, func), or 'time'."""
+            """Evaluate variable, supporting index/name, tuple (vars, func), or 'time'."""
+            label = None
             if var is None:
-                return None
+                return None, None
             if isinstance(var, str) and var.lower() == "time":
                 if t is None:
                     raise ValueError("Time array t must be provided to color by time.")
-                return t
+                return t, "Time [s]"
             if isinstance(var, tuple):
-                vars_list, func = var
+                if len(var) == 2:
+                    vars_list, func = var
+                    label = str(var)
+                elif len(var) == 3:
+                    vars_list, func, label = var
                 indices = [self.var_names.index(v) if isinstance(v, str) else v for v in vars_list]
-                return func(*[y[:, idx] for idx in indices])
+                return func(*[y[:, idx] for idx in indices]), label
             else:
                 idx = self.var_names.index(var) if isinstance(var, str) else var
-                return y[:, idx]
+                return y[:, idx], str(var)
 
         is_3d = z_var is not None
 
@@ -101,17 +105,17 @@ class SolViewer:
             for sol, label in zip(self.sols, self.labels):
                 y = sol.y.T
                 t = sol.t
-                x_vals = eval_var(x_var, y, t)
-                y_vals = eval_var(y_var, y, t)
-                c_vals = eval_var(color, y, t)
+                x_vals, x_label = eval_var(x_var, y, t)
+                y_vals, y_label = eval_var(y_var, y, t)
+                c_vals, c_label = eval_var(color, y, t)
 
                 if c_vals is not None:
                     sc = ax.scatter(x_vals, y_vals, c=c_vals, cmap='viridis', s=10)
                 else:
                     ax.plot(x_vals, y_vals, label=label)
 
-            ax.set_xlabel(str(x_var))
-            ax.set_ylabel(str(y_var))
+            ax.set_xlabel(x_label)
+            ax.set_ylabel(y_label)
             if title:
                 ax.set_title(title)
             ax.grid(True)
@@ -119,7 +123,7 @@ class SolViewer:
                 ax.legend()
             if c_vals is not None:
                 cbar = plt.colorbar(sc, ax=ax)
-                cbar.set_label(str(color))
+                cbar.set_label(c_label)
 
         else:
             fig = plt.figure(figsize=figsize)
@@ -127,19 +131,19 @@ class SolViewer:
             for sol, label in zip(self.sols, self.labels):
                 y = sol.y.T
                 t = sol.t
-                x_vals = eval_var(x_var, y, t)
-                y_vals = eval_var(y_var, y, t)
-                z_vals = eval_var(z_var, y, t)
-                c_vals = eval_var(color, y, t)
+                x_vals, x_label = eval_var(x_var, y, t)
+                y_vals, y_label = eval_var(y_var, y, t)
+                z_vals, z_label = eval_var(z_var, y, t)
+                c_vals, c_label = eval_var(color, y, t)
 
                 if c_vals is not None:
                     sc = ax.scatter(x_vals, y_vals, z_vals, c=c_vals, cmap='viridis', s=10)
                 else:
                     ax.plot(x_vals, y_vals, z_vals, label=label)
 
-            ax.set_xlabel(str(x_var))
-            ax.set_ylabel(str(y_var))
-            ax.set_zlabel(str(z_var))
+            ax.set_xlabel(x_label)
+            ax.set_ylabel(y_label)
+            ax.set_zlabel(z_label)
             if title:
                 ax.set_title(title)
             ax.grid(True)
@@ -147,6 +151,6 @@ class SolViewer:
                 ax.legend()
             if c_vals is not None:
                 cbar = plt.colorbar(sc, ax=ax, shrink=0.5)
-                cbar.set_label(str(color))
+                cbar.set_label(c_label)
 
         return fig
