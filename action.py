@@ -124,6 +124,7 @@ class ActionController(BaseActionController):
 
     def generate_primitives(self, steps: int) -> List[np.ndarray]:
         """Generate hold, ramp-up, ramp-down primitives."""
+
         def control_prims(val, lo, hi, step):
             arrs = []
             arrs.append(np.full(steps + 1, val))  # hold
