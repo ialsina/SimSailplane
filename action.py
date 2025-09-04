@@ -86,6 +86,30 @@ class BaseActionController:
 
         return ctrl_timefun
 
+    def sample_trajectories(
+        self, steps: int, n_samples: int = 100, seed: int = None
+    ) -> List[np.ndarray]:
+        """
+        Randomly sample trajectories respecting per-control step limits and bounds.
+
+        Returns a list of arrays, each of shape (steps+1, 4)
+        """
+        rng = np.random.default_rng(seed)
+        samples = []
+
+        for _ in range(n_samples):
+            traj = np.zeros((steps + 1, 4), dtype=float)
+            traj[0] = self.initial.copy()
+            for k in range(1, steps + 1):
+                inc = rng.uniform(-self.step_max, self.step_max)
+                nxt = traj[k - 1] + inc
+                for j, (lo, hi) in enumerate(self.bounds):
+                    nxt[j] = np.clip(nxt[j], lo, hi)
+                traj[k] = nxt
+            samples.append(traj)
+
+        return samples
+
 
 # ------------------------
 # Eager controller
