@@ -64,21 +64,28 @@ class SolViewer:
         ax.legend()
         return fig
 
-    def phase_plot(self, x_var, y_var, z_var=None, *, time_color=False, figsize=(8,6), title=None):
+    def phase_plot(self, x_var, y_var, z_var=None, *, color=None, figsize=(8,6), title=None):
         """
-        Plot a phase diagram of two or three variables, optionally derived via a function.
+        Plot a phase diagram of two or three variables, with optional coloring.
 
         Args:
             x_var: variable index/name or a tuple (vars_tuple, func) to compute x-values
             y_var: variable index/name or a tuple (vars_tuple, func) to compute y-values
             z_var: optional variable/index/name or tuple (vars_tuple, func) for 3D plot
-            time_color: if True, color points by time along the trajectory
+            color: None, "time", variable index/name, or tuple (vars_tuple, func)
+                Determines the color of points/lines. Adds a colorbar if not None.
             figsize: figure size
             title: optional plot title
         """
 
-        def eval_var(var, y):
-            """Evaluate variable, supporting index/name or tuple (vars, func)."""
+        def eval_var(var, y, t=None):
+            """Evaluate variable, supporting index/name or tuple (vars, func), or 'time'."""
+            if var is None:
+                return None
+            if isinstance(var, str) and var.lower() == "time":
+                if t is None:
+                    raise ValueError("Time array t must be provided to color by time.")
+                return t
             if isinstance(var, tuple):
                 vars_list, func = var
                 indices = [self.var_names.index(v) if isinstance(v, str) else v for v in vars_list]
@@ -87,56 +94,59 @@ class SolViewer:
                 idx = self.var_names.index(var) if isinstance(var, str) else var
                 return y[:, idx]
 
-        # Determine 2D vs 3D
         is_3d = z_var is not None
 
         if not is_3d:
             fig, ax = plt.subplots(figsize=figsize)
-            if time_color:
-                for sol in self.sols:
-                    y = sol.y.T
-                    t = sol.t
-                    x_vals = eval_var(x_var, y)
-                    y_vals = eval_var(y_var, y)
-                    sc = ax.scatter(x_vals, y_vals, c=t, cmap='viridis', s=10)
-                cbar = plt.colorbar(sc)
-                cbar.set_label("Time [s]")
-            else:
-                for sol, label in zip(self.sols, self.labels):
-                    y = sol.y.T
-                    x_vals = eval_var(x_var, y)
-                    y_vals = eval_var(y_var, y)
+            for sol, label in zip(self.sols, self.labels):
+                y = sol.y.T
+                t = sol.t
+                x_vals = eval_var(x_var, y, t)
+                y_vals = eval_var(y_var, y, t)
+                c_vals = eval_var(color, y, t)
+
+                if c_vals is not None:
+                    sc = ax.scatter(x_vals, y_vals, c=c_vals, cmap='viridis', s=10)
+                else:
                     ax.plot(x_vals, y_vals, label=label)
+
             ax.set_xlabel(str(x_var))
             ax.set_ylabel(str(y_var))
+            if title:
+                ax.set_title(title)
+            ax.grid(True)
+            if color is None:
+                ax.legend()
+            if c_vals is not None:
+                cbar = plt.colorbar(sc, ax=ax)
+                cbar.set_label(str(color))
+
         else:
             fig = plt.figure(figsize=figsize)
             ax = fig.add_subplot(111, projection='3d')
-            if time_color:
-                for sol in self.sols:
-                    y = sol.y.T
-                    t = sol.t
-                    x_vals = eval_var(x_var, y)
-                    y_vals = eval_var(y_var, y)
-                    z_vals = eval_var(z_var, y)
-                    sc = ax.scatter(x_vals, y_vals, z_vals, c=t, cmap='viridis', s=10)
-                cbar = plt.colorbar(sc)
-                cbar.set_label("Time [s]")
-            else:
-                for sol, label in zip(self.sols, self.labels):
-                    y = sol.y.T
-                    x_vals = eval_var(x_var, y)
-                    y_vals = eval_var(y_var, y)
-                    z_vals = eval_var(z_var, y)
+            for sol, label in zip(self.sols, self.labels):
+                y = sol.y.T
+                t = sol.t
+                x_vals = eval_var(x_var, y, t)
+                y_vals = eval_var(y_var, y, t)
+                z_vals = eval_var(z_var, y, t)
+                c_vals = eval_var(color, y, t)
+
+                if c_vals is not None:
+                    sc = ax.scatter(x_vals, y_vals, z_vals, c=c_vals, cmap='viridis', s=10)
+                else:
                     ax.plot(x_vals, y_vals, z_vals, label=label)
+
             ax.set_xlabel(str(x_var))
             ax.set_ylabel(str(y_var))
             ax.set_zlabel(str(z_var))
-
-        if title:
-            ax.set_title(title)
-        ax.grid(True)
-        if not time_color:
-            ax.legend()
+            if title:
+                ax.set_title(title)
+            ax.grid(True)
+            if color is None:
+                ax.legend()
+            if c_vals is not None:
+                cbar = plt.colorbar(sc, ax=ax, shrink=0.5)
+                cbar.set_label(str(color))
 
         return fig

@@ -1,5 +1,6 @@
 from numpy import pi, zeros
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 from action import ActionControllerLazy
 from simulation import Sailplane6DOF
@@ -50,6 +51,35 @@ for c_traj in tqdm(ctrl_trajs):
 var_names = ['pN','pE','pD','u','v','w','p','q','r','q0','q1','q2','q3']
 print(len(sols))
 viewer = SolViewer(sols, var_names=var_names)
-fig = viewer.phase_plot('pN', 'u', title="north-east Positions")
 
-fig.savefig("Figure.png")
+plt.ion()
+
+fig = viewer.phase_plot(
+    (("pN", "pE", "pD"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2)),
+    (("u", "v", "w"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2)),
+    title="Position Speed"
+)
+
+fig.savefig("Figure1.png")
+
+fig = viewer.phase_plot(
+    "pN",
+    "pE",
+    "pD",
+    color=(("u", "v", "w"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2)),
+    title="Position Speed"
+)
+
+fig.savefig("Figure2.png")
+fig.show()
+
+fig = viewer.phase_plot(
+    "pN",
+    "pD",
+    (("u", "v", "w"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2)),
+    color="time",
+    title="Position Speed Time"
+)
+
+fig.savefig("Figure3.png")
+fig.show()
