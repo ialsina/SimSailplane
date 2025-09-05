@@ -1,44 +1,41 @@
-from numpy import pi, zeros
+from numpy import array
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from simsailplane import ActionControllerLazy, Sailplane6DOF, SolViewer
+from simsailplane import ActionControllerLazy, Sailplane6DOF, SolViewer, SimArguments, PlaneArguments
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = ROOT_DIR / "output"
 
+# Unified argument parser combines both simulation and aircraft parameters
+INTERACTIVE = False
+
 def main():
+    # Create a unified argument parser that combines both SimArguments and PlaneArguments
+    sim_parser = SimArguments.get_argument_parser()
+    parser = PlaneArguments.get_argument_parser(sim_parser)
+    
+    # Parse all arguments at once
+    args = parser.parse_args()
+    
+    # Create the argument objects
+    sim_args = SimArguments.from_arguments(args)
+    plane_args = PlaneArguments.from_arguments(args)
+    
+    # Create the sailplane with custom parameters
+    plane_params = plane_args.to_plane_params()
+    plane = Sailplane6DOF(**plane_params)
 
-    deg = pi / 180
-    bounds = [(-20 * deg, 20 * deg), (-15 * deg, 15 * deg), (-15 * deg, 15 * deg), (0, 1)]
-    max_rate = [30 * deg, 20 * deg, 20 * deg, 0.5]
-    dt = 0.5
-    num = 20
+    # Create action controller
+    ctrl = ActionControllerLazy(sim_args.bounds, sim_args.max_rate, sim_args.dt, sim_args.initial)
 
-    ctrl = ActionControllerLazy(bounds, max_rate, dt)
-
-    steps = 30
-    disc = (3, 3, 3, 3)
-    seed = 42
-
-    # print("Total trajectories:", ctrl.num_trajectories(steps, disc))
-
-    # # Get first trajectory
-    # traj0 = ctrl.trajectory_by_index(0, steps, disc)
-
-    # # Iterate lazily over first 5 trajectories
-    # for i, traj in zip(range(5), ctrl.enumerate_lazy(steps, disc)):
-    #     print(f"Trajectory {i} shape:", traj.shape)
-
-    ctrl_trajs = ctrl.sample_trajectories(steps, num, seed=42)
-
-    plane = Sailplane6DOF()
+    # Generate control trajectories
+    ctrl_trajs = ctrl.sample_trajectories(sim_args.steps, sim_args.num, seed=sim_args.seed)
 
     # x0 = initial 6-DOF state
     # [pN, pE, pD, u, v, w, p, q, r, q0, q1, q2, q3]
-    x0 = zeros(13)
-    x0[9] = 1.0  # initial quaternion identity
+    x0 = array(sim_args.initial_state)
 
     sols = []
 
@@ -46,7 +43,7 @@ def main():
     for c_traj in tqdm(ctrl_trajs):
         c_fun = ctrl.trajectory_to_ctrl_timefun(c_traj)
 
-        t_span = (0.0, dt * (c_traj.shape[0] - 1))  # total simulation time
+        t_span = (0.0, sim_args.dt * (c_traj.shape[0] - 1))  # total simulation time
 
         sol = plane.integrate(x0, t_span, ctrl_timefun=c_fun)
 
@@ -75,7 +72,8 @@ def main():
     )
 
     fig.savefig(OUTPUT_DIR / "Figure2.png")
-    fig.show()
+    if INTERACTIVE:
+        fig.show()
 
     fig = viewer.phase_plot(
         "pN",
@@ -86,7 +84,8 @@ def main():
     )
 
     fig.savefig(OUTPUT_DIR / "Figure3.png")
-    fig.show()
+    if INTERACTIVE:
+        fig.show()
 
 if __name__ == "__main__":
     main()
