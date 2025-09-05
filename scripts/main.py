@@ -1,85 +1,92 @@
 from numpy import pi, zeros
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+from pathlib import Path
 
-from action import ActionControllerLazy
-from simulation import Sailplane6DOF
-from plotter import SolViewer
+from simsailplane import ActionControllerLazy, Sailplane6DOF, SolViewer
 
-deg = pi / 180
-bounds = [(-20 * deg, 20 * deg), (-15 * deg, 15 * deg), (-15 * deg, 15 * deg), (0, 1)]
-max_rate = [30 * deg, 20 * deg, 20 * deg, 0.5]
-dt = 0.5
-num = 20
+ROOT_DIR = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = ROOT_DIR / "output"
 
-ctrl = ActionControllerLazy(bounds, max_rate, dt)
+def main():
 
-steps = 30
-disc = (3, 3, 3, 3)
-seed = 42
+    deg = pi / 180
+    bounds = [(-20 * deg, 20 * deg), (-15 * deg, 15 * deg), (-15 * deg, 15 * deg), (0, 1)]
+    max_rate = [30 * deg, 20 * deg, 20 * deg, 0.5]
+    dt = 0.5
+    num = 20
 
-# print("Total trajectories:", ctrl.num_trajectories(steps, disc))
+    ctrl = ActionControllerLazy(bounds, max_rate, dt)
 
-# # Get first trajectory
-# traj0 = ctrl.trajectory_by_index(0, steps, disc)
+    steps = 30
+    disc = (3, 3, 3, 3)
+    seed = 42
 
-# # Iterate lazily over first 5 trajectories
-# for i, traj in zip(range(5), ctrl.enumerate_lazy(steps, disc)):
-#     print(f"Trajectory {i} shape:", traj.shape)
+    # print("Total trajectories:", ctrl.num_trajectories(steps, disc))
 
-ctrl_trajs = ctrl.sample_trajectories(steps, num, seed=42)
+    # # Get first trajectory
+    # traj0 = ctrl.trajectory_by_index(0, steps, disc)
 
-plane = Sailplane6DOF()
+    # # Iterate lazily over first 5 trajectories
+    # for i, traj in zip(range(5), ctrl.enumerate_lazy(steps, disc)):
+    #     print(f"Trajectory {i} shape:", traj.shape)
 
-# x0 = initial 6-DOF state
-# [pN, pE, pD, u, v, w, p, q, r, q0, q1, q2, q3]
-x0 = zeros(13)
-x0[9] = 1.0  # initial quaternion identity
+    ctrl_trajs = ctrl.sample_trajectories(steps, num, seed=42)
 
-sols = []
+    plane = Sailplane6DOF()
+
+    # x0 = initial 6-DOF state
+    # [pN, pE, pD, u, v, w, p, q, r, q0, q1, q2, q3]
+    x0 = zeros(13)
+    x0[9] = 1.0  # initial quaternion identity
+
+    sols = []
 
 
-for c_traj in tqdm(ctrl_trajs):
-    c_fun = ctrl.trajectory_to_ctrl_timefun(c_traj)
+    for c_traj in tqdm(ctrl_trajs):
+        c_fun = ctrl.trajectory_to_ctrl_timefun(c_traj)
 
-    t_span = (0.0, dt * (c_traj.shape[0] - 1))  # total simulation time
+        t_span = (0.0, dt * (c_traj.shape[0] - 1))  # total simulation time
 
-    sol = plane.integrate(x0, t_span, ctrl_timefun=c_fun)
+        sol = plane.integrate(x0, t_span, ctrl_timefun=c_fun)
 
-    sols.append(sol)
+        sols.append(sol)
 
-var_names = ['pN','pE','pD','u','v','w','p','q','r','q0','q1','q2','q3']
-print(len(sols))
-viewer = SolViewer(sols, var_names=var_names)
+    var_names = ['pN','pE','pD','u','v','w','p','q','r','q0','q1','q2','q3']
+    print(len(sols))
+    viewer = SolViewer(sols, var_names=var_names)
 
-plt.ion()
+    plt.ion()
 
-fig = viewer.phase_plot(
-    (("pN", "pE", "pD"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2), "Dist to (0, 0, 0)"),
-    (("u", "v", "w"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2), "Speed"),
-    title="Position Speed"
-)
+    fig = viewer.phase_plot(
+        (("pN", "pE", "pD"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2), "Dist to (0, 0, 0)"),
+        (("u", "v", "w"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2), "Speed"),
+        title="Position Speed"
+    )
 
-fig.savefig("Figure1.png")
+    fig.savefig(OUTPUT_DIR / "Figure1.png")
 
-fig = viewer.phase_plot(
-    "pN",
-    "pE",
-    "pD",
-    color=(("u", "v", "w"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2), "Speed"),
-    title="Position Speed"
-)
+    fig = viewer.phase_plot(
+        "pN",
+        "pE",
+        "pD",
+        color=(("u", "v", "w"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2), "Speed"),
+        title="Position Speed"
+    )
 
-fig.savefig("Figure2.png")
-fig.show()
+    fig.savefig(OUTPUT_DIR / "Figure2.png")
+    fig.show()
 
-fig = viewer.phase_plot(
-    "pN",
-    (("u", "v", "w"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2), "Speed"),
-    "pD",
-    color="time",
-    title="Position Speed Time"
-)
+    fig = viewer.phase_plot(
+        "pN",
+        (("u", "v", "w"), lambda x, y, z: ((x - 0) ** 2 + (y - 0) ** 2 + (z - 0) ** 2) ** (1 / 2), "Speed"),
+        "pD",
+        color="time",
+        title="Position Speed Time"
+    )
 
-fig.savefig("Figure3.png")
-fig.show()
+    fig.savefig(OUTPUT_DIR / "Figure3.png")
+    fig.show()
+
+if __name__ == "__main__":
+    main()
