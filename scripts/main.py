@@ -1,15 +1,18 @@
+from datetime import datetime
+import json
 from pathlib import Path
 
 from numpy import array
 from numpy.typing import NDArray
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-import scipy.integrate
 
 from simsailplane import (
     ActionControllerLazy,
     Sailplane6DOF,
     SolViewer,
+    ActionViewer,
+    ActionSolViewer,
     SimArguments,
     PlaneArguments,
 )
@@ -18,7 +21,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = ROOT_DIR / "output"
 
 # Unified argument parser combines both simulation and aircraft parameters
-INTERACTIVE = True
+INTERACTIVE = 1
 
 sols = []
 
@@ -40,13 +43,18 @@ def simulate(
     return sol
 
 
-def plot(sols, interactive: bool = False):
+def plot(sols, control_trajs, output_dir: Path, interactive: bool = False):
 
     var_names = ["pN", "pE", "pD", "u", "v", "w", "p", "q", "r", "q0", "q1", "q2", "q3"]
-    viewer = SolViewer(sols, var_names=var_names)
+    control_names = ["delta_a", "delta_e", "delta_r", "airbrake"]
 
-    if interactive:
-        plt.ion()
+    # Create combined viewer
+    combined_viewer = ActionSolViewer(
+        sols, control_trajs, var_names=var_names, control_names=control_names
+    )
+
+    # Original phase plots
+    viewer = SolViewer(sols, var_names=var_names)
 
     fig = viewer.phase_plot(
         (
@@ -62,7 +70,7 @@ def plot(sols, interactive: bool = False):
         title="Position Speed",
     )
 
-    fig.savefig(OUTPUT_DIR / "Figure1.png")
+    fig.savefig(output_dir / "Figure1_PositionSpeed.png")
 
     fig = viewer.phase_plot(
         "pN",
@@ -76,8 +84,8 @@ def plot(sols, interactive: bool = False):
         title="Position Speed",
     )
 
-    fig.savefig(OUTPUT_DIR / "Figure2.png")
-    if interactive:
+    fig.savefig(output_dir / "Figure2_PositionSpeed.png")
+    if interactive == 1:
         fig.show()
 
     fig = viewer.phase_plot(
@@ -92,14 +100,52 @@ def plot(sols, interactive: bool = False):
         title="Position Speed Time",
     )
 
-    fig.savefig(OUTPUT_DIR / "Figure3.png")
-    if interactive:
+    fig.savefig(output_dir / "Figure3_PositionSpeedTime.png")
+    if interactive > 0:
+        fig.show()
+
+    # New combined plots
+    fig = combined_viewer.plot_state_and_controls(
+        state_vars=["pN", "pE"],
+        control_vars=["delta_a", "delta_e"],
+        title="State and Control Evolution",
+    )
+    fig.savefig(output_dir / "Figure4_StateAndControls.png")
+    if interactive > 1:
+        fig.show()
+
+    fig = combined_viewer.plot_combined_evolution(
+        title="Combined State and Control Evolution"
+    )
+    fig.savefig(output_dir / "Figure5_CombinedEvolution.png")
+    if interactive > 1:
+        fig.show()
+
+    fig = combined_viewer.plot_control_effectiveness(
+        title="Control Effectiveness Analysis"
+    )
+    fig.savefig(output_dir / "Figure6_ControlEffectiveness.png")
+    if interactive > 1:
+        fig.show()
+
+    # Control-only plots
+    action_viewer = ActionViewer(control_trajs, control_names=control_names)
+    fig = action_viewer.plot_control_evolution(title="Control Surface Evolution")
+    fig.savefig(output_dir / "Figure7_ControlEvolution.png")
+    if interactive > 1:
+        fig.show()
+
+    # Dual-axis plot: all state variables vs all control variables
+    fig = combined_viewer.plot_dual_axis(
+        title="All State and Control Variables vs Time",
+        show_all_trajectories=False,  # Show only first trajectory for clarity
+    )
+    fig.savefig(output_dir / "Figure8_DualAxis.png")
+    if interactive > 1:
         fig.show()
 
 
 def main():
-
-    global sols
 
     # Create a unified argument parser that combines both SimArguments and PlaneArguments
     sim_parser = SimArguments.get_argument_parser()
@@ -136,7 +182,14 @@ def main():
         sol = simulate(ctrl, c_traj, x0, plane, sim_args)
         sols.append(sol)
 
-    plot(sols, interactive=INTERACTIVE)
+    output_dir = OUTPUT_DIR / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    output_dir.mkdir(parents=False, exist_ok=True)
+    args_json = {k: v for k, v in args.__dict__.items()}
+
+    with open(output_dir / "args.json", "w") as f:
+        json.dump(args_json, f)
+
+    plot(sols, ctrl_trajs, output_dir, interactive=INTERACTIVE)
 
 
 if __name__ == "__main__":
