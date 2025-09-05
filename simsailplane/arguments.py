@@ -4,6 +4,7 @@ from numpy import pi
 
 deg = pi / 180
 
+
 @dataclass
 class PlaneArguments:
     # Geometry parameters
@@ -11,13 +12,13 @@ class PlaneArguments:
     wing_span: float = 15.0  # b (m)
     mean_chord: float = 1.2  # cbar (m)
     mass: float = 300.0  # kg
-    
+
     # Inertia parameters (diagonal approximation)
     Ixx: float = 200.0  # kg·m²
     Iyy: float = 150.0  # kg·m²
     Izz: float = 300.0  # kg·m²
-    Ixz: float = 0.0    # kg·m²
-    
+    Ixz: float = 0.0  # kg·m²
+
     # Aerodynamic coefficients
     CL0: float = 0.2
     CL_alpha: float = 5.7
@@ -34,34 +35,109 @@ class PlaneArguments:
     def get_argument_parser(cls, parser=None) -> ArgumentParser:
         if parser is None:
             parser = ArgumentParser(description="Aircraft parameters")
-        
+
         # Get default values from the dataclass
         defaults = cls()
-        
+
         # Geometry parameters
-        parser.add_argument("--wing_area", type=float, default=defaults.wing_area, help="Wing area (m²)")
-        parser.add_argument("--wing_span", type=float, default=defaults.wing_span, help="Wing span (m)")
-        parser.add_argument("--mean_chord", type=float, default=defaults.mean_chord, help="Mean aerodynamic chord (m)")
-        parser.add_argument("--mass", type=float, default=defaults.mass, help="Aircraft mass (kg)")
-        
+        parser.add_argument(
+            "--wing_area", type=float, default=defaults.wing_area, help="Wing area (m²)"
+        )
+        parser.add_argument(
+            "--wing_span", type=float, default=defaults.wing_span, help="Wing span (m)"
+        )
+        parser.add_argument(
+            "--mean_chord",
+            type=float,
+            default=defaults.mean_chord,
+            help="Mean aerodynamic chord (m)",
+        )
+        parser.add_argument(
+            "--mass", type=float, default=defaults.mass, help="Aircraft mass (kg)"
+        )
+
         # Inertia parameters
-        parser.add_argument("--Ixx", type=float, default=defaults.Ixx, help="Roll moment of inertia (kg·m²)")
-        parser.add_argument("--Iyy", type=float, default=defaults.Iyy, help="Pitch moment of inertia (kg·m²)")
-        parser.add_argument("--Izz", type=float, default=defaults.Izz, help="Yaw moment of inertia (kg·m²)")
-        parser.add_argument("--Ixz", type=float, default=defaults.Ixz, help="Cross moment of inertia (kg·m²)")
-        
+        parser.add_argument(
+            "--Ixx",
+            type=float,
+            default=defaults.Ixx,
+            help="Roll moment of inertia (kg·m²)",
+        )
+        parser.add_argument(
+            "--Iyy",
+            type=float,
+            default=defaults.Iyy,
+            help="Pitch moment of inertia (kg·m²)",
+        )
+        parser.add_argument(
+            "--Izz",
+            type=float,
+            default=defaults.Izz,
+            help="Yaw moment of inertia (kg·m²)",
+        )
+        parser.add_argument(
+            "--Ixz",
+            type=float,
+            default=defaults.Ixz,
+            help="Cross moment of inertia (kg·m²)",
+        )
+
         # Aerodynamic coefficients
-        parser.add_argument("--CL0", type=float, default=defaults.CL0, help="Zero-angle-of-attack lift coefficient")
-        parser.add_argument("--CL_alpha", type=float, default=defaults.CL_alpha, help="Lift curve slope (1/rad)")
-        parser.add_argument("--CD0", type=float, default=defaults.CD0, help="Zero-lift drag coefficient")
-        parser.add_argument("--k", type=float, default=defaults.k, help="Induced drag factor")
-        parser.add_argument("--Cm0", type=float, default=defaults.Cm0, help="Zero-angle-of-attack pitching moment coefficient")
-        parser.add_argument("--Cm_alpha", type=float, default=defaults.Cm_alpha, help="Pitching moment slope (1/rad)")
-        parser.add_argument("--Cl_beta", type=float, default=defaults.Cl_beta, help="Roll moment due to sideslip (1/rad)")
-        parser.add_argument("--Cl_p", type=float, default=defaults.Cl_p, help="Roll damping derivative (1/rad)")
-        parser.add_argument("--Cn_beta", type=float, default=defaults.Cn_beta, help="Yaw moment due to sideslip (1/rad)")
-        parser.add_argument("--Cn_r", type=float, default=defaults.Cn_r, help="Yaw damping derivative (1/rad)")
-        
+        parser.add_argument(
+            "--CL0",
+            type=float,
+            default=defaults.CL0,
+            help="Zero-angle-of-attack lift coefficient",
+        )
+        parser.add_argument(
+            "--CL_alpha",
+            type=float,
+            default=defaults.CL_alpha,
+            help="Lift curve slope (1/rad)",
+        )
+        parser.add_argument(
+            "--CD0", type=float, default=defaults.CD0, help="Zero-lift drag coefficient"
+        )
+        parser.add_argument(
+            "--k", type=float, default=defaults.k, help="Induced drag factor"
+        )
+        parser.add_argument(
+            "--Cm0",
+            type=float,
+            default=defaults.Cm0,
+            help="Zero-angle-of-attack pitching moment coefficient",
+        )
+        parser.add_argument(
+            "--Cm_alpha",
+            type=float,
+            default=defaults.Cm_alpha,
+            help="Pitching moment slope (1/rad)",
+        )
+        parser.add_argument(
+            "--Cl_beta",
+            type=float,
+            default=defaults.Cl_beta,
+            help="Roll moment due to sideslip (1/rad)",
+        )
+        parser.add_argument(
+            "--Cl_p",
+            type=float,
+            default=defaults.Cl_p,
+            help="Roll damping derivative (1/rad)",
+        )
+        parser.add_argument(
+            "--Cn_beta",
+            type=float,
+            default=defaults.Cn_beta,
+            help="Yaw moment due to sideslip (1/rad)",
+        )
+        parser.add_argument(
+            "--Cn_r",
+            type=float,
+            default=defaults.Cn_r,
+            help="Yaw damping derivative (1/rad)",
+        )
+
         return parser
 
     @classmethod
@@ -97,34 +173,36 @@ class PlaneArguments:
     def to_plane_params(self) -> dict:
         """Convert to parameters suitable for Sailplane6DOF constructor"""
         import numpy as np
-        
+
         # Create inertia matrix
-        inertia = np.array([
-            [self.Ixx, 0.0, -self.Ixz],
-            [0.0, self.Iyy, 0.0],
-            [-self.Ixz, 0.0, self.Izz]
-        ])
-        
+        inertia = np.array(
+            [
+                [self.Ixx, 0.0, -self.Ixz],
+                [0.0, self.Iyy, 0.0],
+                [-self.Ixz, 0.0, self.Izz],
+            ]
+        )
+
         return {
-            'geom': {
-                'S': self.wing_area,
-                'b': self.wing_span,
-                'cbar': self.mean_chord,
-                'mass': self.mass
+            "geom": {
+                "S": self.wing_area,
+                "b": self.wing_span,
+                "cbar": self.mean_chord,
+                "mass": self.mass,
             },
-            'inertia': inertia,
-            'aero': {
-                'CL0': self.CL0,
-                'CL_alpha': self.CL_alpha,
-                'CD0': self.CD0,
-                'k': self.k,
-                'Cm0': self.Cm0,
-                'Cm_alpha': self.Cm_alpha,
-                'Cl_beta': self.Cl_beta,
-                'Cl_p': self.Cl_p,
-                'Cn_beta': self.Cn_beta,
-                'Cn_r': self.Cn_r,
-            }
+            "inertia": inertia,
+            "aero": {
+                "CL0": self.CL0,
+                "CL_alpha": self.CL_alpha,
+                "CD0": self.CD0,
+                "k": self.k,
+                "Cm0": self.Cm0,
+                "Cm_alpha": self.Cm_alpha,
+                "Cl_beta": self.Cl_beta,
+                "Cl_p": self.Cl_p,
+                "Cn_beta": self.Cn_beta,
+                "Cn_r": self.Cn_r,
+            },
         }
 
 
@@ -135,30 +213,62 @@ class SimArguments:
     seed: int = 42
     num: int = 1
     dt: float = 0.5
-    bounds: tuple = ((-20 * deg, 20 * deg), (-15 * deg, 15 * deg), (-15 * deg, 15 * deg), (0, 1))
+    bounds: tuple = (
+        (-20 * deg, 20 * deg),
+        (-15 * deg, 15 * deg),
+        (-15 * deg, 15 * deg),
+        (0, 1),
+    )
     max_rate: tuple = (30 * deg, 20 * deg, 20 * deg, 0.5)
     initial: tuple = (0, 0, 0, 0)
-    initial_state: tuple = (0, 0, -1000, 30, 0, 0, 0, 0, 0, 1, 0, 0, 0)  # [pN, pE, pD, u, v, w, p, q, r, q0, q1, q2, q3]
+    initial_state: tuple = (
+        0,
+        0,
+        -1000,
+        30,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+    )  # [pN, pE, pD, u, v, w, p, q, r, q0, q1, q2, q3]
     wind_ned: tuple = (0, 0, 0)
 
     @classmethod
     def get_argument_parser(cls, parser=None) -> ArgumentParser:
         if parser is None:
             parser = ArgumentParser(description="Simulation arguments")
-        
+
         # Get default values from the dataclass
         defaults = cls()
-        
+
         parser.add_argument("--steps", type=int, default=defaults.steps)
-        parser.add_argument("--discretization_per_control", nargs=4, type=int, default=defaults.discretization_per_control)
+        parser.add_argument(
+            "--discretization_per_control",
+            nargs=4,
+            type=int,
+            default=defaults.discretization_per_control,
+        )
         parser.add_argument("--seed", type=int, default=defaults.seed)
         parser.add_argument("--num", type=int, default=defaults.num)
         parser.add_argument("--dt", type=float, default=defaults.dt)
-        parser.add_argument("--bounds", nargs=8, type=float, default=list(sum(defaults.bounds, ())))
-        parser.add_argument("--max_rate", nargs=4, type=float, default=defaults.max_rate)
+        parser.add_argument(
+            "--bounds", nargs=8, type=float, default=list(sum(defaults.bounds, ()))
+        )
+        parser.add_argument(
+            "--max_rate", nargs=4, type=float, default=defaults.max_rate
+        )
         parser.add_argument("--initial", nargs=4, type=float, default=defaults.initial)
-        parser.add_argument("--initial_state", nargs=13, type=float, default=defaults.initial_state)
-        parser.add_argument("--wind_ned", nargs=3, type=float, default=defaults.wind_ned)
+        parser.add_argument(
+            "--initial_state", nargs=13, type=float, default=defaults.initial_state
+        )
+        parser.add_argument(
+            "--wind_ned", nargs=3, type=float, default=defaults.wind_ned
+        )
         return parser
 
     @classmethod
@@ -170,7 +280,7 @@ class SimArguments:
             (args.bounds[4], args.bounds[5]),  # rudder bounds
             (args.bounds[6], args.bounds[7]),  # airbrake bounds
         ]
-        
+
         return cls(
             steps=args.steps,
             discretization_per_control=tuple(args.discretization_per_control),

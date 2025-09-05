@@ -26,8 +26,7 @@ class SolViewer:
         self.N_state = sols[0].y.shape[0]
         self.var_names = var_names or [f"x{i}" for i in range(self.N_state)]
 
-
-    def plot_against_time(self, vars_to_plot=None, title=None, figsize=(8,6)):
+    def plot_against_time(self, vars_to_plot=None, title=None, figsize=(8, 6)):
         """
         Plot selected variables against time.
 
@@ -64,7 +63,9 @@ class SolViewer:
         ax.legend()
         return fig
 
-    def phase_plot(self, x_var, y_var, z_var=None, *, color=None, figsize=(8,6), title=None):
+    def phase_plot(
+        self, x_var, y_var, z_var=None, *, color=None, figsize=(8, 6), title=None
+    ):
         """
         Plot a phase diagram of two or three variables, with optional coloring.
 
@@ -92,7 +93,10 @@ class SolViewer:
                     label = str(var)
                 elif len(var) == 3:
                     vars_list, func, label = var
-                indices = [self.var_names.index(v) if isinstance(v, str) else v for v in vars_list]
+                indices = [
+                    self.var_names.index(v) if isinstance(v, str) else v
+                    for v in vars_list
+                ]
                 return func(*[y[:, idx] for idx in indices]), label
             else:
                 idx = self.var_names.index(var) if isinstance(var, str) else var
@@ -110,7 +114,7 @@ class SolViewer:
                 c_vals, c_label = eval_var(color, y, t)
 
                 if c_vals is not None:
-                    sc = ax.scatter(x_vals, y_vals, c=c_vals, cmap='viridis', s=10)
+                    sc = ax.scatter(x_vals, y_vals, c=c_vals, cmap="viridis", s=10)
                 else:
                     ax.plot(x_vals, y_vals, label=label)
 
@@ -127,7 +131,7 @@ class SolViewer:
 
         else:
             fig = plt.figure(figsize=figsize)
-            ax = fig.add_subplot(111, projection='3d')
+            ax = fig.add_subplot(111, projection="3d")
             for sol, label in zip(self.sols, self.labels):
                 y = sol.y.T
                 t = sol.t
@@ -137,7 +141,9 @@ class SolViewer:
                 c_vals, c_label = eval_var(color, y, t)
 
                 if c_vals is not None:
-                    sc = ax.scatter(x_vals, y_vals, z_vals, c=c_vals, cmap='viridis', s=10)
+                    sc = ax.scatter(
+                        x_vals, y_vals, z_vals, c=c_vals, cmap="viridis", s=10
+                    )
                 else:
                     ax.plot(x_vals, y_vals, z_vals, label=label)
 
